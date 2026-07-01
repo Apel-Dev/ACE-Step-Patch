@@ -209,6 +209,22 @@ class InitServiceOrchestratorMixin:
                 "vae_checkpoint": resolved_vae_variant,
             }
 
+            if torch.cuda.is_available():
+                major, _ = torch.cuda.get_device_capability()
+                if major < 8:  # pre-Ampere (T4, P100, V100, etc.)
+                    print("⚠️ Pre-Ampere GPU detected — forcing float32 for DiT to prevent NaN")
+                    self.dtype = torch.float32
+                    if hasattr(self, 'model') and self.model is not None:
+                        self.model = self.model.float()
+                        print(f"   ✅ DiT model cast to float32")
+                    if hasattr(self, 'silence_latent') and self.silence_latent is not None:
+                        self.silence_latent = self.silence_latent.float()
+                        print(f"   ✅ silence_latent cast to float32")
+                    # Also cast text_encoder and vae dtype references
+                    print(f"   ✅ dit.dtype = {self.dtype}")
+
+            print("✅ DiT loaded")
+
             return status_msg, True
         except Exception as exc:
             self.model = None
